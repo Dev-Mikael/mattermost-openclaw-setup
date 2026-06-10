@@ -21,10 +21,11 @@ SECRET_PREFIX="${SECRET_PREFIX:-mattermost-openclaw-setup}"
 MM_ADMIN_EMAIL="${MM_ADMIN_EMAIL:-${LETSENCRYPT_EMAIL}}"
 MM_BOT_CHANNELS="${MM_BOT_CHANNELS:-town-square}"
 MM_BOT_DM_POLICY="${MM_BOT_DM_POLICY:-pairing}"
+ANTHROPIC_API_KEY="${ANTHROPIC_API_KEY:-not-configured}"
 
 missing=()
 for var in MM_ADMIN_USERNAME MM_ADMIN_PASSWORD OPENCLAW_GATEWAY_TOKEN \
-           ANTHROPIC_API_KEY GEMINI_API_KEY LITELLM_MASTER_KEY; do
+           GEMINI_API_KEY LITELLM_MASTER_KEY; do
   [[ -z "${!var:-}" ]] && missing+=("$var")
 done
 if [[ ${#missing[@]} -gt 0 ]]; then
