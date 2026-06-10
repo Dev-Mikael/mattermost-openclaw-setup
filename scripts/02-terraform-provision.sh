@@ -58,6 +58,10 @@ rm -f /tmp/tfplan
 
 log_step "Reading Terraform outputs → .env"
 OUTPUTS=$(terraform -chdir="$TF_DIR" output -json)
+SSH_KEY_OUTPUT="$(echo "$OUTPUTS" | jq -r '.ssh_key_path.value')"
+if [[ "$SSH_KEY_OUTPUT" != /* ]]; then
+  SSH_KEY_OUTPUT="$TF_DIR/${SSH_KEY_OUTPUT#./}"
+fi
 
 update_env "CP_PUBLIC_IP"      "$(echo "$OUTPUTS" | jq -r '.control_plane_public_ip.value')"  "$ROOT_DIR/.env"
 update_env "CP_PRIVATE_IP"     "$(echo "$OUTPUTS" | jq -r '.control_plane_private_ip.value')" "$ROOT_DIR/.env"
@@ -67,7 +71,7 @@ update_env "WORKER1_PRIVATE_IP" "$(echo "$OUTPUTS" | jq -r '.worker_private_ips.
 update_env "WORKER2_PRIVATE_IP" "$(echo "$OUTPUTS" | jq -r '.worker_private_ips.value[1]')"  "$ROOT_DIR/.env"
 update_env "WORKER_PUBLIC_IPS"  "$(echo "$OUTPUTS" | jq -r '.worker_public_ips.value | join(",")')"  "$ROOT_DIR/.env"
 update_env "WORKER_PRIVATE_IPS" "$(echo "$OUTPUTS" | jq -r '.worker_private_ips.value | join(",")')" "$ROOT_DIR/.env"
-update_env "SSH_KEY_PATH"      "$(echo "$OUTPUTS" | jq -r '.ssh_key_path.value')"             "$ROOT_DIR/.env"
+update_env "SSH_KEY_PATH"      "$SSH_KEY_OUTPUT"                                               "$ROOT_DIR/.env"
 update_env "NLB_DNS_NAME"      "$(echo "$OUTPUTS" | jq -r '.nlb_dns_name.value')"             "$ROOT_DIR/.env"
 update_env "S3_BUCKET_NAME"    "$(echo "$OUTPUTS" | jq -r '.s3_bucket_name.value')"           "$ROOT_DIR/.env"
 

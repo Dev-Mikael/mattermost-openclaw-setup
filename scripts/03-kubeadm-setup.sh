@@ -20,6 +20,19 @@ FLANNEL_VERSION="v0.25.5"
 LOCAL_PATH_VERSION="v0.0.28"
 SSH_USER="${SSH_USER:-ubuntu}"
 SSH_KEY="${SSH_KEY_PATH}"
+if [[ "$SSH_KEY" != /* ]]; then
+  if [[ -f "$ROOT_DIR/$SSH_KEY" ]]; then
+    SSH_KEY="$ROOT_DIR/$SSH_KEY"
+  elif [[ -f "$ROOT_DIR/terraform/environments/${ENVIRONMENT:-production}/${SSH_KEY#./}" ]]; then
+    SSH_KEY="$ROOT_DIR/terraform/environments/${ENVIRONMENT:-production}/${SSH_KEY#./}"
+  fi
+fi
+if [[ ! -f "$SSH_KEY" ]]; then
+  log_error "SSH key not found: $SSH_KEY"
+  log_error "Run scripts/02-terraform-provision.sh so SSH_KEY_PATH is refreshed in .env."
+  exit 1
+fi
+chmod 600 "$SSH_KEY"
 SSH_OPTS="-i $SSH_KEY -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
   -o ConnectTimeout=15 -o BatchMode=yes -o ServerAliveInterval=30"
 
@@ -162,7 +175,7 @@ kubectl wait node --all --for=condition=Ready --timeout=180s
 
 echo "==> Generating worker join command"
 kubeadm token create --print-join-command > /tmp/kubeadm-join.sh
-chmod 600 /tmp/kubeadm-join.sh
+chmod 644 /tmp/kubeadm-join.sh
 echo "==> Control plane init complete"
 CPSCRIPT
 
@@ -177,7 +190,11 @@ scp $SSH_OPTS "${SSH_USER}@${CP_PUBLIC_IP}:~/.kube/config" "$HOME/.kube/config"
 log_ok "kubeconfig saved to ~/.kube/config"
 
 log_step "Phase 3b — Fetching join command from control plane"
-scp $SSH_OPTS "${SSH_USER}@${CP_PUBLIC_IP}:/tmp/kubeadm-join.sh" /tmp/kubeadm-join.sh
+if ! scp $SSH_OPTS "${SSH_USER}@${CP_PUBLIC_IP}:/tmp/kubeadm-join.sh" /tmp/kubeadm-join.sh; then
+  log_warn "Direct scp failed; fetching join command with sudo"
+  ssh $SSH_OPTS "${SSH_USER}@${CP_PUBLIC_IP}" "sudo cat /tmp/kubeadm-join.sh" > /tmp/kubeadm-join.sh
+  chmod 600 /tmp/kubeadm-join.sh
+fi
 log_ok "Join command fetched"
 
 # ── Phase 4: Join workers ─────────────────────────────────────────────────────

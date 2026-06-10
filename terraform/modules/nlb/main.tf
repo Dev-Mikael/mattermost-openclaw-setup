@@ -10,7 +10,7 @@
 #   - If a worker goes down, NLB health checks remove it from rotation
 
 resource "aws_lb" "ingress" {
-  name               = "${var.cluster_name}-${var.environment}-nlb"
+  name               = "${var.cluster_name}-nlb"
   load_balancer_type = "network"
   internal           = false
   subnets            = var.public_subnet_ids
@@ -20,14 +20,14 @@ resource "aws_lb" "ingress" {
   enable_cross_zone_load_balancing = true
 
   tags = {
-    Name        = "${var.cluster_name}-${var.environment}-nlb"
+    Name        = "${var.cluster_name}-nlb"
     Environment = var.environment
   }
 }
 
 # ── HTTP target group (port 80 → NodePort 30080) ─────────────────────────────
 resource "aws_lb_target_group" "http" {
-  name        = "${var.cluster_name}-${var.environment}-http"
+  name        = "${var.cluster_name}-http"
   port        = 30080
   protocol    = "TCP"
   vpc_id      = var.vpc_id
@@ -43,14 +43,14 @@ resource "aws_lb_target_group" "http" {
   }
 
   tags = {
-    Name        = "${var.cluster_name}-${var.environment}-http-tg"
+    Name        = "${var.cluster_name}-http-tg"
     Environment = var.environment
   }
 }
 
 # ── HTTPS target group (port 443 → NodePort 30443) ───────────────────────────
 resource "aws_lb_target_group" "https" {
-  name        = "${var.cluster_name}-${var.environment}-https"
+  name        = "${var.cluster_name}-https"
   port        = 30443
   protocol    = "TCP"
   vpc_id      = var.vpc_id
@@ -66,7 +66,7 @@ resource "aws_lb_target_group" "https" {
   }
 
   tags = {
-    Name        = "${var.cluster_name}-${var.environment}-https-tg"
+    Name        = "${var.cluster_name}-https-tg"
     Environment = var.environment
   }
 }
