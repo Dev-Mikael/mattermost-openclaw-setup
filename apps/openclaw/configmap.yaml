@@ -32,15 +32,15 @@ data:
         "defaults": {
           "workspace": "~/.openclaw/workspace",
           "model": {
-            "primary": "google/gemini-2.5-pro",
-            "fallbacks": ["anthropic/claude-sonnet-4-6"]
+            "primary": "google/gemini-2.5-flash-lite",
+            "fallbacks": ["google/gemini-2.5-flash"]
           },
           "models": {
-            "google/gemini-2.5-pro": {
-              "alias": "Gemini 2.5 Pro"
+            "google/gemini-2.5-flash-lite": {
+              "alias": "Gemini 2.5 Flash-Lite"
             },
-            "anthropic/claude-sonnet-4-6": {
-              "alias": "Claude Sonnet 4.6"
+            "google/gemini-2.5-flash": {
+              "alias": "Gemini 2.5 Flash"
             }
           },
           "sandbox": {
