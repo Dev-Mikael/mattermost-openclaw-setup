@@ -36,7 +36,7 @@ resource "aws_secretsmanager_secret" "openclaw_gateway_token" {
 
 resource "aws_secretsmanager_secret" "anthropic_api_key" {
   name                    = "${var.secret_prefix}/anthropic-api-key"
-  description             = "Anthropic API key used by OpenClaw LiteLLM"
+  description             = "Optional Anthropic API key used by OpenClaw fallback models"
   recovery_window_in_days = var.secret_recovery_window
 
   tags = {
@@ -48,19 +48,7 @@ resource "aws_secretsmanager_secret" "anthropic_api_key" {
 
 resource "aws_secretsmanager_secret" "gemini_api_key" {
   name                    = "${var.secret_prefix}/gemini-api-key"
-  description             = "Google Gemini API key used by OpenClaw LiteLLM"
-  recovery_window_in_days = var.secret_recovery_window
-
-  tags = {
-    Environment = var.environment
-    ManagedBy   = "terraform"
-    Component   = "openclaw"
-  }
-}
-
-resource "aws_secretsmanager_secret" "litellm_master_key" {
-  name                    = "${var.secret_prefix}/litellm-master-key"
-  description             = "LiteLLM master key used by OpenClaw"
+  description             = "Google Gemini API key used by OpenClaw"
   recovery_window_in_days = var.secret_recovery_window
 
   tags = {

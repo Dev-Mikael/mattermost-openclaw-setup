@@ -9,7 +9,7 @@ ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 source "$SCRIPT_DIR/lib/common.sh"
 load_env "$ROOT_DIR/.env"
 
-log_section "07 - OpenClaw / KubeClaw Setup"
+log_section "07 - OpenClaw Setup"
 require_tool kubectl
 require_tool curl
 require_tool python3
@@ -25,15 +25,11 @@ ANTHROPIC_API_KEY="${ANTHROPIC_API_KEY:-not-configured}"
 
 missing=()
 for var in MM_ADMIN_USERNAME MM_ADMIN_PASSWORD OPENCLAW_GATEWAY_TOKEN \
-           GEMINI_API_KEY LITELLM_MASTER_KEY; do
+           GEMINI_API_KEY; do
   [[ -z "${!var:-}" ]] && missing+=("$var")
 done
 if [[ ${#missing[@]} -gt 0 ]]; then
   log_error "Missing required variables in .env: ${missing[*]}"
-  exit 1
-fi
-if [[ "${LITELLM_MASTER_KEY}" != sk-* ]]; then
-  log_error "LITELLM_MASTER_KEY must start with sk-"
   exit 1
 fi
 
@@ -176,7 +172,7 @@ log_step "Creating Mattermost bot token"
 TOKEN_RESP=$(curl -s -X POST "$MM_API/api/v4/users/${BOT_USER_ID}/tokens" \
   -H "Authorization: Bearer $MM_TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"description":"OpenClaw KubeClaw integration token"}' 2>/dev/null || true)
+  -d '{"description":"OpenClaw Mattermost integration token"}' 2>/dev/null || true)
 MATTERMOST_BOT_TOKEN=$(echo "$TOKEN_RESP" | json_get token)
 
 [[ -z "$MATTERMOST_BOT_TOKEN" ]] && {
@@ -220,48 +216,29 @@ trap - EXIT
 
 log_step "Writing OpenClaw secrets to AWS Secrets Manager"
 put_secret "${SECRET_PREFIX}/openclaw-gateway-token" "$OPENCLAW_GATEWAY_TOKEN" "OpenClaw gateway bearer token"
-put_secret "${SECRET_PREFIX}/anthropic-api-key" "$ANTHROPIC_API_KEY" "Anthropic API key for OpenClaw LiteLLM"
-put_secret "${SECRET_PREFIX}/gemini-api-key" "$GEMINI_API_KEY" "Gemini API key for OpenClaw LiteLLM"
-put_secret "${SECRET_PREFIX}/litellm-master-key" "$LITELLM_MASTER_KEY" "LiteLLM master key for OpenClaw"
+put_secret "${SECRET_PREFIX}/anthropic-api-key" "$ANTHROPIC_API_KEY" "Optional Anthropic API key for OpenClaw fallback models"
+put_secret "${SECRET_PREFIX}/gemini-api-key" "$GEMINI_API_KEY" "Gemini API key for OpenClaw"
 put_secret "${SECRET_PREFIX}/mattermost-bot-token" "$MATTERMOST_BOT_TOKEN" "Mattermost bot token for OpenClaw"
 
 log_step "Reconciling OpenClaw GitOps layer"
 flux reconcile source git flux-system --timeout=2m 2>/dev/null || true
 flux reconcile kustomization openclaw --with-source --timeout=2m 2>/dev/null || true
 
-log_step "Waiting for kubeclaw-secret"
+log_step "Waiting for openclaw-secrets"
 for i in $(seq 1 30); do
-  kubectl get secret kubeclaw-secret -n kubeclaw &>/dev/null && { log_ok "kubeclaw-secret exists"; break; }
+  kubectl get secret openclaw-secrets -n openclaw &>/dev/null && { log_ok "openclaw-secrets exists"; break; }
   log_info "Waiting for ESO sync... attempt $i/30"
   sleep 10
 done
 
-log_step "Waiting for KubeClaw HelmRelease"
-for i in $(seq 1 60); do
-  HR_READY=$(kubectl get helmrelease kubeclaw -n kubeclaw \
-    -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || true)
-  [[ "$HR_READY" == "True" ]] && { log_ok "KubeClaw HelmRelease Ready"; break; }
-  log_info "Waiting for HelmRelease... attempt $i/60"
-  sleep 10
-done
-
-log_step "Waiting for KubeClaw gateway pod"
-for i in $(seq 1 60); do
-  GW_READY=$(kubectl get pods -n kubeclaw -l app.kubernetes.io/name=kubeclaw \
-    -o jsonpath='{.items[0].status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || true)
-  [[ "$GW_READY" == "True" ]] && { log_ok "KubeClaw gateway Ready"; break; }
-  log_info "Waiting for gateway... attempt $i/60"
-  sleep 10
-done
-
-if [[ "${GW_READY:-}" == "True" ]]; then
-  GW_POD=$(kubectl get pods -n kubeclaw -l app.kubernetes.io/name=kubeclaw \
-    -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
-  log_step "Installing bundled Mattermost plugin"
-  kubectl exec -n kubeclaw "$GW_POD" -- \
-    openclaw plugins install ./extensions/mattermost 2>/dev/null || true
-  kubectl exec -n kubeclaw "$GW_POD" -- \
-    openclaw gateway restart 2>/dev/null || true
+log_step "Waiting for OpenClaw deployment"
+if kubectl rollout status deployment/openclaw -n openclaw --timeout=10m; then
+  log_ok "OpenClaw deployment Ready"
+else
+  log_error "OpenClaw deployment did not become Ready"
+  echo "  Debug: kubectl describe deployment openclaw -n openclaw"
+  echo "  Logs : kubectl logs -n openclaw -l app=openclaw --tail=100"
+  exit 1
 fi
 
 log_section "OpenClaw Setup Complete"

@@ -8,7 +8,7 @@
 #   04. FluxCD: bootstrap GitOps — Flux watches the repo and reconciles everything
 #   05. Secrets: push DB password to AWS Secrets Manager (ESO syncs into cluster)
 #   06. Verify: check all components, DNS, TLS, and NLB reachability
-#   07. OpenClaw: create Mattermost bot token and deploy KubeClaw
+#   07. OpenClaw: create Mattermost bot token and deploy OpenClaw
 #
 # Prerequisites:
 #   1. cp .env.example .env && nano .env   (fill in all values)
@@ -80,7 +80,7 @@ log_section "Step 6/7 - Verify Mattermost Deployment"
 bash scripts/06-verify.sh
 
 # ── Step 7: OpenClaw ──────────────────────────────────────────────────────────
-log_section "Step 7/7 - OpenClaw: Mattermost Bot + KubeClaw"
+log_section "Step 7/7 - OpenClaw: Mattermost Bot"
 bash scripts/07-setup-openclaw.sh
 
 # ── Done ──────────────────────────────────────────────────────────────────────
@@ -97,7 +97,7 @@ echo ""
 echo -e "${BOLD}  Watch deployment:${NC}"
 echo "    flux get kustomizations -A --watch"
 echo "    kubectl get pods -n mattermost --watch"
-echo "    kubectl get pods -n kubeclaw --watch"
+echo "    kubectl get pods -n openclaw --watch"
 echo ""
 echo -e "${BOLD}  When done, tear down with:${NC}"
 echo "    bash teardown.sh"

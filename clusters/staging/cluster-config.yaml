@@ -12,4 +12,3 @@ data:
   AWS_REGION: "us-east-1"
   SECRET_PREFIX: "mattermost-openclaw-setup"
   MM_BOT_DM_POLICY: "pairing"
-  MM_BOT_ALLOW_FROM: '[]'

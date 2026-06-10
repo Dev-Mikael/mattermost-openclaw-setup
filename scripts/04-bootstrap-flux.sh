@@ -46,7 +46,6 @@ data:
   AWS_REGION: "${AWS_REGION:-us-east-1}"
   SECRET_PREFIX: "${SECRET_PREFIX:-mattermost-openclaw-setup}"
   MM_BOT_DM_POLICY: "${MM_BOT_DM_POLICY:-pairing}"
-  MM_BOT_ALLOW_FROM: '${MM_BOT_ALLOW_FROM}'
 EOF
 log_ok "cluster-config.yaml rendered"
 

@@ -26,21 +26,21 @@ require_tool python3
 BOLD='\033[1m'; NC='\033[0m'
 
 # ── Check Gateway pod is running ──────────────────────────────────────────────
-GW_POD=$(kubectl get pod -n kubeclaw -l app.kubernetes.io/name=kubeclaw \
+GW_POD=$(kubectl get pod -n openclaw -l app=openclaw \
   -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
 
 if [[ -z "$GW_POD" ]]; then
-  log_error "KubeClaw Gateway pod not found. Is KubeClaw deployed?"
-  log_error "Check: kubectl get pods -n kubeclaw"
+  log_error "OpenClaw Gateway pod not found. Is OpenClaw deployed?"
+  log_error "Check: kubectl get pods -n openclaw"
   exit 1
 fi
 
-GW_READY=$(kubectl get pod -n kubeclaw "$GW_POD" \
+GW_READY=$(kubectl get pod -n openclaw "$GW_POD" \
   -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || echo "")
 
 if [[ "$GW_READY" != "True" ]]; then
   log_error "Gateway pod '$GW_POD' is not Ready."
-  log_error "Check: kubectl describe pod -n kubeclaw $GW_POD"
+  log_error "Check: kubectl describe pod -n openclaw $GW_POD"
   exit 1
 fi
 
@@ -105,7 +105,7 @@ case "$CHOICE" in
   # ── 1: List pending pairings ───────────────────────────────────────────────
   1)
     log_step "Pending pairings"
-    kubectl exec -n kubeclaw "$GW_POD" -- \
+    kubectl exec -n openclaw "$GW_POD" -- \
       openclaw pairing list mattermost 2>/dev/null || echo "  (none pending or pairing disabled)"
     ;;
 
@@ -114,14 +114,14 @@ case "$CHOICE" in
     log_step "Approve pairing code"
     echo ""
     # Show current list first so user knows which codes are available
-    kubectl exec -n kubeclaw "$GW_POD" -- \
+    kubectl exec -n openclaw "$GW_POD" -- \
       openclaw pairing list mattermost 2>/dev/null || echo "  (none pending)"
     echo ""
     read -rp "  Enter pairing code to approve: " PAIR_CODE
     if [[ -z "$PAIR_CODE" ]]; then
       log_warn "No code entered"
     else
-      kubectl exec -n kubeclaw "$GW_POD" -- \
+      kubectl exec -n openclaw "$GW_POD" -- \
         openclaw pairing approve mattermost "$PAIR_CODE" 2>/dev/null && \
         log_ok "Pairing code '$PAIR_CODE' approved" || \
         log_warn "Could not approve code '$PAIR_CODE' — check the code is correct"
@@ -133,7 +133,7 @@ case "$CHOICE" in
     log_step "Approving all pending pairings"
 
     # Retrieve list, extract codes, approve each one
-    PAIR_LIST=$(kubectl exec -n kubeclaw "$GW_POD" -- \
+    PAIR_LIST=$(kubectl exec -n openclaw "$GW_POD" -- \
       openclaw pairing list mattermost 2>/dev/null || true)
 
     if [[ -z "$PAIR_LIST" ]] || echo "$PAIR_LIST" | grep -qi "none\|empty\|no pending"; then
@@ -148,7 +148,7 @@ case "$CHOICE" in
       else
         while IFS= read -r CODE; do
           [[ -z "$CODE" ]] && continue
-          kubectl exec -n kubeclaw "$GW_POD" -- \
+          kubectl exec -n openclaw "$GW_POD" -- \
             openclaw pairing approve mattermost "$CODE" 2>/dev/null && \
             log_ok "Approved: $CODE" || \
             log_warn "Failed to approve: $CODE"
@@ -219,20 +219,20 @@ except: pass
   5)
     log_step "Bot status"
     echo ""
-    kubectl exec -n kubeclaw "$GW_POD" -- openclaw status --all 2>/dev/null || true
+    kubectl exec -n openclaw "$GW_POD" -- openclaw status --all 2>/dev/null || true
     echo ""
     log_step "Plugin list"
-    kubectl exec -n kubeclaw "$GW_POD" -- openclaw plugins list 2>/dev/null || true
+    kubectl exec -n openclaw "$GW_POD" -- openclaw plugins list 2>/dev/null || true
     echo ""
     log_step "Flux resources"
-    kubectl get helmrelease kubeclaw -n kubeclaw 2>/dev/null || true
-    kubectl get pods -n kubeclaw 2>/dev/null || true
+    kubectl get deployment,svc,ingress,externalsecret -n openclaw 2>/dev/null || true
+    kubectl get pods -n openclaw 2>/dev/null || true
     ;;
 
   # ── 6: Tail Gateway logs ─────────────────────────────────────────────────
   6)
     log_step "Gateway logs (Ctrl+C to stop)"
-    kubectl logs -n kubeclaw "$GW_POD" -f --tail=50
+    kubectl logs -n openclaw "$GW_POD" -f --tail=50
     ;;
 
   q|Q)

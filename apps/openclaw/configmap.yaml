@@ -1,0 +1,87 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: openclaw-config
+  namespace: openclaw
+  labels:
+    app: openclaw
+data:
+  openclaw.json: |
+    {
+      "gateway": {
+        "mode": "local",
+        "bind": "lan",
+        "port": 18789,
+        "auth": {
+          "mode": "token",
+          "token": "$${OPENCLAW_GATEWAY_TOKEN}"
+        },
+        "controlUi": {
+          "enabled": true
+        }
+      },
+      "session": {
+        "dmScope": "per-channel-peer"
+      },
+      "agents": {
+        "defaults": {
+          "workspace": "~/.openclaw/workspace",
+          "model": {
+            "primary": "google/gemini-2.5-pro",
+            "fallbacks": ["anthropic/claude-sonnet-4-6"]
+          },
+          "models": {
+            "google/gemini-2.5-pro": {
+              "alias": "Gemini 2.5 Pro"
+            },
+            "anthropic/claude-sonnet-4-6": {
+              "alias": "Claude Sonnet 4.6"
+            }
+          },
+          "sandbox": {
+            "mode": "non-main"
+          }
+        },
+        "list": [
+          {
+            "id": "main",
+            "name": "Mattermost Assistant",
+            "workspace": "~/.openclaw/workspace"
+          }
+        ]
+      },
+      "tools": {
+        "profile": "messaging",
+        "exec": {
+          "security": "deny",
+          "ask": "always"
+        },
+        "elevated": {
+          "enabled": false
+        }
+      },
+      "channels": {
+        "mattermost": {
+          "enabled": true,
+          "botToken": "$${MATTERMOST_BOT_TOKEN}",
+          "baseUrl": "http://mattermost.mattermost.svc.cluster.local:8065",
+          "chatmode": "oncall",
+          "dmPolicy": "${MM_BOT_DM_POLICY}",
+          "groupPolicy": "open",
+          "commands": {
+            "native": true,
+            "nativeSkills": true,
+            "callbackUrl": "http://openclaw.openclaw.svc.cluster.local:18789/api/channels/mattermost/command"
+          }
+        }
+      },
+      "cron": {
+        "enabled": false
+      }
+    }
+  AGENTS.md: |
+    # Mattermost Assistant
+
+    You are OpenClaw running inside this Kubernetes cluster. Help Mattermost
+    users clearly and safely. Keep replies concise unless the user asks for
+    detail, and do not run host commands from chat.

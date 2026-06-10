@@ -2,7 +2,7 @@
 
 Production-oriented self-hosted **Mattermost + OpenClaw** on Kubernetes.
 
-**Stack:** Terraform, AWS EC2 kubeadm, AWS NLB, FluxCD GitOps, CloudNativePG, External Secrets Operator, AWS Secrets Manager, AWS S3, cert-manager, nginx-ingress, KubeClaw/OpenClaw
+**Stack:** Terraform, AWS EC2 kubeadm, AWS NLB, FluxCD GitOps, CloudNativePG, External Secrets Operator, AWS Secrets Manager, AWS S3, cert-manager, nginx-ingress, OpenClaw
 
 ## Architecture
 
@@ -13,7 +13,7 @@ Your Machine
   +- flux bootstrap   -> GitOps reconciliation from this repo
   +- ESO              -> AWS Secrets Manager -> Kubernetes Secrets
   +- CNPG             -> PostgreSQL primary + replica for Mattermost
-  +- OpenClaw setup   -> Mattermost bot token + KubeClaw deployment
+  +- OpenClaw setup   -> Mattermost bot token + OpenClaw deployment
 
 Internet -> AWS NLB 80/443 -> worker NodePorts 30080/30443 -> nginx -> apps
 ```
@@ -70,7 +70,7 @@ Create DNS records after Terraform prints the NLB DNS name:
 | `infrastructure/` | Operators/controllers installed by Flux HelmReleases |
 | `apps/database/` | CNPG Cluster and ESO database secrets |
 | `apps/mattermost/` | Mattermost CR using CNPG + S3 |
-| `apps/kubeclaw/` | OpenClaw/KubeClaw HelmRelease, ingress, network policy, ESO secret |
+| `apps/openclaw/` | Official-style OpenClaw Kustomize manifests, nginx ingress, network policy, ESO secret |
 | `scripts/07-setup-openclaw.sh` | Creates Mattermost bot token and OpenClaw AWS secrets |
 | `scripts/08-manage-bot.sh` | Day-2 bot/pairing/channel helper |
 
@@ -83,7 +83,6 @@ mattermost-openclaw-setup/db-password
 mattermost-openclaw-setup/openclaw-gateway-token
 mattermost-openclaw-setup/anthropic-api-key
 mattermost-openclaw-setup/gemini-api-key
-mattermost-openclaw-setup/litellm-master-key
 mattermost-openclaw-setup/mattermost-bot-token
 ```
 
@@ -96,7 +95,7 @@ make validate
 make status
 flux get kustomizations -A
 kubectl get pods -n mattermost
-kubectl get pods -n kubeclaw
+kubectl get pods -n openclaw
 bash scripts/08-manage-bot.sh
 ```
 

@@ -45,7 +45,7 @@ validate:
 	kubectl kustomize infrastructure >/dev/null
 	kubectl kustomize apps/database >/dev/null
 	kubectl kustomize apps/mattermost >/dev/null
-	kubectl kustomize apps/kubeclaw >/dev/null
+	kubectl kustomize apps/openclaw >/dev/null
 	@echo "Validation complete"
 
 watch:
@@ -71,4 +71,4 @@ status:
 	@kubectl get cluster -n mattermost 2>/dev/null || echo "  Not deployed yet"
 	@echo ""
 	@echo "=== OpenClaw ==="
-	@kubectl get helmrelease kubeclaw -n kubeclaw 2>/dev/null || echo "  Not deployed yet"
+	@kubectl get deployment openclaw -n openclaw 2>/dev/null || echo "  Not deployed yet"

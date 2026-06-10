@@ -3,8 +3,9 @@ kind: Kustomization
 resources:
   - namespace.yaml
   - external-secret.yaml
-  - helmrelease.yaml
+  - pvc.yaml
+  - configmap.yaml
+  - deployment.yaml
+  - service.yaml
   - ingress.yaml
-  - networkpolicy-mattermost.yaml
-  - envoy-proxy-config.yaml
-  - hpa-chromium.yaml
+  - networkpolicy.yaml

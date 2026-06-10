@@ -109,7 +109,7 @@ spec:
 
     # Allow internal CNPG and OpenClaw callback connections without TLS validation issues
     - name: MM_SERVICESETTINGS_ALLOWEDUNTRUSTEDINTERNALCONNECTIONS
-      value: "mattermost-db-rw.mattermost.svc.cluster.local kubeclaw.kubeclaw.svc.cluster.local"
+      value: "mattermost-db-rw.mattermost.svc.cluster.local openclaw.openclaw.svc.cluster.local"
     - name: MM_FILESETTINGS_AMAZONS3SSL
       value: "true"   # S3 always uses HTTPS
 

@@ -1,0 +1,29 @@
+# Exposes the OpenClaw Control UI through the existing nginx ingress stack.
+# DNS: openclaw.${DOMAIN} should CNAME to the same AWS NLB as ${DOMAIN}.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: openclaw
+  namespace: openclaw
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
+spec:
+  tls:
+    - hosts:
+        - openclaw.${DOMAIN}
+      secretName: openclaw-tls
+  rules:
+    - host: openclaw.${DOMAIN}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: openclaw
+                port:
+                  number: 18789
