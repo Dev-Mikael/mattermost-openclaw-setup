@@ -1,0 +1,26 @@
+# Mattermost application — depends on:
+#   - infrastructure (operators installed)
+#   - cert-manager-config (ClusterIssuers ready for TLS)
+#   - database (CNPG cluster running, DB secrets exist)
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: apps
+  namespace: flux-system
+spec:
+  interval: 10m0s
+  dependsOn:
+    - name: infrastructure
+    - name: cert-manager-config
+    - name: database
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  path: ./apps
+  prune: true
+  wait: true
+  timeout: 15m0s
+  postBuild:
+    substituteFrom:
+      - kind: ConfigMap
+        name: cluster-values
