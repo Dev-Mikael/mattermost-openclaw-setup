@@ -82,8 +82,9 @@ echo "==> Installing containerd (container runtime)"
 apt-get update -qq
 apt-get install -y -qq ca-certificates curl gnupg lsb-release
 install -m 0755 -d /etc/apt/keyrings
+rm -f /etc/apt/keyrings/docker.gpg
 curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
-  | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+  | gpg --batch --yes --dearmor -o /etc/apt/keyrings/docker.gpg
 chmod a+r /etc/apt/keyrings/docker.gpg
 echo "deb [arch=\$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
   https://download.docker.com/linux/ubuntu \$(lsb_release -cs) stable" \
@@ -97,8 +98,9 @@ systemctl restart containerd && systemctl enable containerd
 
 echo "==> Installing kubeadm, kubelet, kubectl (v${K8S_VERSION})"
 apt-get install -y -qq apt-transport-https
+rm -f /etc/apt/keyrings/kubernetes-apt-keyring.gpg
 curl -fsSL "https://pkgs.k8s.io/core:/stable:/v\${K8S_VERSION}/deb/Release.key" \
-  | gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+  | gpg --batch --yes --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
 echo "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] \
   https://pkgs.k8s.io/core:/stable:/v\${K8S_VERSION}/deb/ /" \
   > /etc/apt/sources.list.d/kubernetes.list
