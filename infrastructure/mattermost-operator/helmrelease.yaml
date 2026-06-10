@@ -17,7 +17,7 @@ spec:
   chart:
     spec:
       chart: mattermost-operator
-      version: "1.0.6"  # pinned — check https://helm.mattermost.com
+      version: "1.0.5"  # pinned — check https://helm.mattermost.com
       sourceRef:
         kind: HelmRepository
         name: mattermost
