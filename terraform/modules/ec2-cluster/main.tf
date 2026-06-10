@@ -225,6 +225,12 @@ resource "aws_instance" "workers" {
   iam_instance_profile        = var.worker_instance_profile
   associate_public_ip_address = true
 
+  metadata_options {
+    http_endpoint               = "enabled"
+    http_tokens                 = "required"
+    http_put_response_hop_limit = 2
+  }
+
   root_block_device {
     volume_type           = "gp3"
     volume_size           = var.worker_disk_size_gb

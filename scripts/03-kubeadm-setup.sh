@@ -4,7 +4,7 @@
 # Phases:
 #   1. Install prerequisites on ALL nodes (containerd, kubelet, kubeadm, kubectl)
 #   2. Run kubeadm init on the control plane
-#   3. Install Flannel CNI and local-path-provisioner
+#   3. Install Flannel CNI and local-path-provisioner fallback storage
 #   4. Run kubeadm join on each worker node
 #   5. Fetch kubeconfig to local ~/.kube/config
 #
@@ -14,6 +14,12 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 source "$SCRIPT_DIR/lib/common.sh"
 load_env "$ROOT_DIR/.env"
+
+SSM_FALLBACK_ENABLED="${SSM_FALLBACK_ENABLED:-true}"
+if [[ "$SSM_FALLBACK_ENABLED" == "true" ]]; then
+  require_tool aws
+  require_tool jq
+fi
 
 K8S_VERSION="1.30"
 FLANNEL_VERSION="v0.25.5"
@@ -41,7 +47,9 @@ log_info "Control plane : ${SSH_USER}@${CP_PUBLIC_IP} (private: ${CP_PRIVATE_IP}
 
 WORKER_PUBLIC_IPS="${WORKER_PUBLIC_IPS:-${WORKER1_PUBLIC_IP:-},${WORKER2_PUBLIC_IP:-}}"
 WORKER_PRIVATE_IPS="${WORKER_PRIVATE_IPS:-${WORKER1_PRIVATE_IP:-},${WORKER2_PRIVATE_IP:-}}"
+WORKER_INSTANCE_IDS="${WORKER_INSTANCE_IDS:-}"
 IFS=',' read -r -a WORKER_PUBLIC_LIST <<< "$WORKER_PUBLIC_IPS"
+IFS=',' read -r -a WORKER_INSTANCE_LIST <<< "$WORKER_INSTANCE_IDS"
 
 if [[ ${#WORKER_PUBLIC_LIST[@]} -lt 1 || -z "${WORKER_PUBLIC_LIST[0]}" ]]; then
   log_error "No worker IPs found. Run scripts/02-terraform-provision.sh first."
@@ -51,6 +59,121 @@ fi
 for idx in "${!WORKER_PUBLIC_LIST[@]}"; do
   log_info "Worker $((idx + 1))      : ${SSH_USER}@${WORKER_PUBLIC_LIST[$idx]}"
 done
+
+wait_for_ssh_soft() {
+  local host="$1"
+  local key="$2"
+  local user="${3:-ubuntu}"
+  local max_attempts="${4:-30}"
+  local opts="-i $key -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+    -o ConnectTimeout=10 -o BatchMode=yes -o ServerAliveInterval=30"
+
+  log_info "Waiting for SSH on ${host} (up to $((max_attempts * 10))s)..."
+  for i in $(seq 1 "$max_attempts"); do
+    if ssh $opts "${user}@${host}" "echo ok" &>/dev/null; then
+      log_ok "SSH ready on ${host}"
+      return 0
+    fi
+    log_info "  attempt ${i}/${max_attempts} — retrying in 10s..."
+    sleep 10
+  done
+
+  log_warn "SSH not available on ${host} after $((max_attempts * 10))s"
+  return 1
+}
+
+wait_for_ssm() {
+  local instance_id="$1"
+  local max_attempts="${2:-30}"
+  local status=""
+
+  [[ -z "$instance_id" || "$SSM_FALLBACK_ENABLED" != "true" ]] && return 1
+
+  log_info "Waiting for SSM on ${instance_id} (up to $((max_attempts * 10))s)..."
+  for i in $(seq 1 "$max_attempts"); do
+    status="$(aws ssm describe-instance-information \
+      --filters "Key=InstanceIds,Values=${instance_id}" \
+      --query 'InstanceInformationList[0].PingStatus' \
+      --output text 2>/dev/null || true)"
+    if [[ "$status" == "Online" ]]; then
+      log_ok "SSM ready on ${instance_id}"
+      return 0
+    fi
+    log_info "  attempt ${i}/${max_attempts} — SSM status: ${status:-unknown}; retrying in 10s..."
+    sleep 10
+  done
+
+  log_warn "SSM not available on ${instance_id} after $((max_attempts * 10))s"
+  return 1
+}
+
+ssm_send_script() {
+  local instance_id="$1"
+  local script_path="$2"
+  local comment="$3"
+  local params command_id status stdout stderr
+
+  if ! wait_for_ssm "$instance_id"; then
+    return 1
+  fi
+  params="$(jq -n --rawfile script "$script_path" '{commands: ["cat > /tmp/mm-ssm-script.sh <<'"'"'MM_SSM_SCRIPT'"'"'\n\($script)\nMM_SSM_SCRIPT", "chmod +x /tmp/mm-ssm-script.sh", "sudo bash /tmp/mm-ssm-script.sh"]}')"
+  command_id="$(aws ssm send-command \
+    --document-name "AWS-RunShellScript" \
+    --instance-ids "$instance_id" \
+    --comment "$comment" \
+    --parameters "$params" \
+    --query 'Command.CommandId' \
+    --output text)"
+
+  log_info "SSM command ${command_id} sent to ${instance_id}"
+  aws ssm wait command-executed --command-id "$command_id" --instance-id "$instance_id" || true
+
+  stdout="$(aws ssm get-command-invocation \
+    --command-id "$command_id" \
+    --instance-id "$instance_id" \
+    --query 'StandardOutputContent' \
+    --output text 2>/dev/null || true)"
+  stderr="$(aws ssm get-command-invocation \
+    --command-id "$command_id" \
+    --instance-id "$instance_id" \
+    --query 'StandardErrorContent' \
+    --output text 2>/dev/null || true)"
+  status="$(aws ssm get-command-invocation \
+    --command-id "$command_id" \
+    --instance-id "$instance_id" \
+    --query 'Status' \
+    --output text 2>/dev/null || true)"
+
+  [[ -n "$stdout" && "$stdout" != "None" ]] && printf '%s\n' "$stdout"
+  [[ -n "$stderr" && "$stderr" != "None" ]] && printf '%s\n' "$stderr" >&2
+
+  if [[ "$status" != "Success" ]]; then
+    log_error "SSM command ${command_id} failed on ${instance_id} with status: ${status:-unknown}"
+    return 1
+  fi
+}
+
+run_worker_prereqs() {
+  local worker_ip="$1"
+  local worker_num="$2"
+  local instance_id="${3:-}"
+
+  log_step "Phase 1 worker ${worker_num} — Installing prerequisites"
+  if wait_for_ssh_soft "$worker_ip" "$SSH_KEY" "$SSH_USER"; then
+    scp $SSH_OPTS /tmp/mm-node-prereqs.sh "${SSH_USER}@${worker_ip}:/tmp/prereqs.sh"
+    ssh $SSH_OPTS -tt "${SSH_USER}@${worker_ip}" "sudo bash /tmp/prereqs.sh"
+    return 0
+  fi
+
+  if [[ "$SSM_FALLBACK_ENABLED" == "true" && -n "$instance_id" ]]; then
+    log_warn "Falling back to SSM for worker ${worker_num} (${instance_id})"
+    ssm_send_script "$instance_id" /tmp/mm-node-prereqs.sh "mattermost-kubeadm-prereqs-worker-${worker_num}"
+    return 0
+  fi
+
+  log_error "Worker ${worker_num} is not reachable by SSH and no SSM instance ID is available."
+  exit 1
+}
 
 # ── Phase 1: Prerequisites on all nodes ──────────────────────────────────────
 # This script is copied to each node and run as root.
@@ -118,10 +241,7 @@ ssh $SSH_OPTS -tt "${SSH_USER}@${CP_PUBLIC_IP}" "sudo bash /tmp/prereqs.sh"
 for idx in "${!WORKER_PUBLIC_LIST[@]}"; do
   worker_ip="${WORKER_PUBLIC_LIST[$idx]}"
   [[ -z "$worker_ip" ]] && continue
-  log_step "Phase 1 worker $((idx + 1)) — Installing prerequisites"
-  wait_for_ssh "$worker_ip" "$SSH_KEY" "$SSH_USER"
-  scp $SSH_OPTS /tmp/mm-node-prereqs.sh "${SSH_USER}@${worker_ip}:/tmp/prereqs.sh"
-  ssh $SSH_OPTS -tt "${SSH_USER}@${worker_ip}" "sudo bash /tmp/prereqs.sh"
+  run_worker_prereqs "$worker_ip" "$((idx + 1))" "${WORKER_INSTANCE_LIST[$idx]:-}"
 done
 
 log_ok "Prerequisites installed on all nodes"
@@ -167,7 +287,7 @@ echo "Workloads stay on worker nodes so pods can use the worker IAM instance pro
 echo "==> Installing Flannel CNI v\${FLANNEL_VERSION}"
 kubectl apply -f "https://github.com/flannel-io/flannel/releases/download/\${FLANNEL_VERSION}/kube-flannel.yml"
 
-echo "==> Installing local-path-provisioner v\${LOCAL_PATH_VERSION} (default StorageClass)"
+echo "==> Installing local-path-provisioner v\${LOCAL_PATH_VERSION} (fallback default StorageClass)"
 kubectl apply -f "https://raw.githubusercontent.com/rancher/local-path-provisioner/\${LOCAL_PATH_VERSION}/deploy/local-path-storage.yaml"
 kubectl patch storageclass local-path \\
   -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"true"}}}'
@@ -203,16 +323,27 @@ log_ok "Join command fetched"
 join_worker() {
   local worker_ip="$1"
   local worker_num="$2"
+  local instance_id="${3:-}"
   log_step "Phase 4${worker_num} — Joining worker ${worker_num} (${worker_ip})"
-  scp $SSH_OPTS /tmp/kubeadm-join.sh "${SSH_USER}@${worker_ip}:/tmp/kubeadm-join.sh"
-  ssh $SSH_OPTS -tt "${SSH_USER}@${worker_ip}" "sudo bash /tmp/kubeadm-join.sh"
+
+  if wait_for_ssh_soft "$worker_ip" "$SSH_KEY" "$SSH_USER"; then
+    scp $SSH_OPTS /tmp/kubeadm-join.sh "${SSH_USER}@${worker_ip}:/tmp/kubeadm-join.sh"
+    ssh $SSH_OPTS -tt "${SSH_USER}@${worker_ip}" "sudo bash /tmp/kubeadm-join.sh"
+  elif [[ "$SSM_FALLBACK_ENABLED" == "true" && -n "$instance_id" ]]; then
+    log_warn "Falling back to SSM for worker ${worker_num} (${instance_id})"
+    ssm_send_script "$instance_id" /tmp/kubeadm-join.sh "mattermost-kubeadm-join-worker-${worker_num}"
+  else
+    log_error "Worker ${worker_num} is not reachable by SSH and no SSM instance ID is available."
+    exit 1
+  fi
+
   log_ok "Worker ${worker_num} joined"
 }
 
 for idx in "${!WORKER_PUBLIC_LIST[@]}"; do
   worker_ip="${WORKER_PUBLIC_LIST[$idx]}"
   [[ -z "$worker_ip" ]] && continue
-  join_worker "$worker_ip" "$((idx + 1))"
+  join_worker "$worker_ip" "$((idx + 1))" "${WORKER_INSTANCE_LIST[$idx]:-}"
 done
 
 # ── Phase 5: Verify all nodes Ready ──────────────────────────────────────────

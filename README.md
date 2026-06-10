@@ -2,17 +2,17 @@
 
 Production-oriented self-hosted **Mattermost + OpenClaw** on Kubernetes.
 
-**Stack:** Terraform, AWS EC2 kubeadm, AWS NLB, FluxCD GitOps, CloudNativePG, External Secrets Operator, AWS Secrets Manager, AWS S3, cert-manager, nginx-ingress, OpenClaw
+**Stack:** Terraform, AWS EC2 kubeadm, AWS NLB, FluxCD GitOps, CloudNativePG, AWS EBS CSI, External Secrets Operator, AWS Secrets Manager, AWS S3, cert-manager, nginx-ingress, OpenClaw
 
 ## Architecture
 
 ```
 Your Machine
   +- terraform apply  -> VPC, EC2, NLB, S3, IAM, Secrets Manager
-  +- kubeadm          -> Kubernetes control plane + workers over SSH
+  +- kubeadm          -> Kubernetes control plane + workers over SSH, with SSM fallback for workers
   +- flux bootstrap   -> GitOps reconciliation from this repo
   +- ESO              -> AWS Secrets Manager -> Kubernetes Secrets
-  +- CNPG             -> PostgreSQL primary + replica for Mattermost
+  +- CNPG             -> PostgreSQL primary + replicas for Mattermost
   +- OpenClaw setup   -> Mattermost bot token + OpenClaw deployment
 
 Internet -> AWS NLB 80/443 -> worker NodePorts 30080/30443 -> nginx -> apps
@@ -82,6 +82,13 @@ mattermost-openclaw-setup/mattermost-bot-token
 ```
 
 ESO syncs those into Kubernetes at runtime. Secret values are not committed.
+
+## Bootstrap Notes
+
+`scripts/02-terraform-provision.sh` writes `WORKER_PUBLIC_IPS`,
+`WORKER_PRIVATE_IPS`, and `WORKER_INSTANCE_IDS` into `.env`. The kubeadm step
+tries SSH first for worker setup and join, then falls back to AWS SSM when a
+worker's public SSH endpoint is not reachable yet.
 
 ## Useful Commands
 

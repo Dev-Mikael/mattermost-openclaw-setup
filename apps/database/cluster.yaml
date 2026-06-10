@@ -1,4 +1,4 @@
-# CloudNativePG Cluster — HA PostgreSQL with primary + replica
+# CloudNativePG Cluster — HA PostgreSQL with primary + replicas
 #
 # Key concepts demonstrated here (relevant to KCNA):
 #   - Custom Resource: Cluster is a CRD installed by the CNPG operator
@@ -23,9 +23,9 @@ metadata:
   name: mattermost-db
   namespace: mattermost
 spec:
-  # 2 instances = 1 primary + 1 replica. Enough for HA with low resource usage.
-  # Increase to 3 for quorum-based leader election in production.
-  instances: 2
+  # 3 instances = 1 primary + 2 replicas. This gives CNPG another healthy
+  # candidate if one worker wedges and avoids depending on a single replica.
+  instances: 3
 
   # PostgreSQL version — pin to major.minor for reproducibility
   imageName: ghcr.io/cloudnative-pg/postgresql:16.4
@@ -39,38 +39,42 @@ spec:
       secret:
         name: cnpg-app-user-secret
 
-  # Storage — one PVC per instance, sized for the deployment
+  # Storage — one EBS-backed PVC per instance, sized for the deployment.
+  # WaitForFirstConsumer on the ebs-gp3 StorageClass keeps volumes in the same
+  # AZ as the scheduled database pod, while avoiding node-local disk lock-in.
   storage:
-    size: 10Gi
-    storageClass: local-path   # local-path-provisioner installed by kubeadm script
+    size: 20Gi
+    storageClass: ebs-gp3
 
-  # PostgreSQL configuration — tuned for a t3.medium worker node
+  # PostgreSQL configuration — tuned for t3.medium worker nodes
   # These parameters are PostgreSQL config values, not Kubernetes resource limits
   postgresql:
     parameters:
       max_connections: "100"
-      shared_buffers: "128MB"        # ~25% of the 512Mi memory limit below
-      effective_cache_size: "256MB"
+      shared_buffers: "256MB"
+      effective_cache_size: "768MB"
       work_mem: "4MB"
-      maintenance_work_mem: "32MB"
+      maintenance_work_mem: "64MB"
       checkpoint_completion_target: "0.9"
       wal_buffers: "16MB"
       default_statistics_target: "100"
       log_min_duration_statement: "1000"  # Log slow queries > 1s
 
-  # Resource limits — scoped to fit on a t3.medium worker
+  # Resource limits — scoped to fit on t3.medium workers while leaving room for
+  # Mattermost, ingress, ESO, Flux, and OpenClaw during a one-worker loss.
   resources:
     requests:
-      cpu: 200m
-      memory: 256Mi
+      cpu: 250m
+      memory: 512Mi
     limits:
       cpu: 1000m
-      memory: 512Mi
+      memory: 1Gi
 
-  # Anti-affinity: ensure primary and replica land on different worker nodes
-  # If both were on the same node, a node failure would take out the whole cluster
+  # Anti-affinity: require database instances to land on different nodes.
+  # With three workers, this prevents one node failure from taking out more than
+  # one Postgres instance.
   affinity:
-    podAntiAffinityType: preferred   # preferred = try but don't block scheduling
+    podAntiAffinityType: required
     topologyKey: kubernetes.io/hostname
 
   # Monitoring — exposes PostgreSQL metrics for Prometheus scraping

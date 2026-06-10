@@ -51,7 +51,7 @@ Important infrastructure fixes already applied:
 - Fixed `terraform/modules/s3/variables.tf` so `force_destroy` is a valid multi-line Terraform variable block.
 - Added an explicit empty lifecycle `filter { prefix = "" }` in the S3 lifecycle rule to avoid provider warnings.
 - Shortened NLB target group names to stay under AWS's 32-character target group name limit.
-- `scripts/02-terraform-provision.sh` writes Terraform outputs back into `.env`, including node IPs, SSH key path, NLB DNS, and S3 bucket.
+- `scripts/02-terraform-provision.sh` writes Terraform outputs back into `.env`, including node IPs, worker instance IDs, SSH key path, NLB DNS, and S3 bucket.
 
 ## kubeadm Cluster Bootstrap
 
@@ -62,15 +62,18 @@ Current behavior:
 - Installs containerd, kubeadm, kubelet, and kubectl on the control plane and worker nodes.
 - Initializes Kubernetes on the control plane.
 - Installs Flannel CNI.
-- Installs local-path-provisioner and marks it as the default StorageClass.
+- Installs local-path-provisioner as fallback storage. CNPG is configured to use
+  the EBS-backed `ebs-gp3` StorageClass installed by Flux.
 - Fetches kubeconfig locally to `~/.kube/config`.
 - Fetches the worker join command using a sudo fallback when direct `scp` cannot read `/tmp/kubeadm-join.sh`.
 - Joins workers and waits for all nodes to become Ready.
+- For workers, tries SSH first and falls back to AWS SSM when public SSH is not reachable but the instance is online in SSM.
 
 Important bootstrap notes:
 
 - Early SSH retries can happen while EC2 cloud-init is still finishing. That is normal.
 - Worker public IPs must come from Terraform outputs; rerun `scripts/02-terraform-provision.sh` if `.env` is stale.
+- `WORKER_INSTANCE_IDS` is required for the worker SSM fallback path.
 - The control plane remains tainted so regular workloads run on worker nodes.
 
 ## Flux Bootstrap
@@ -270,6 +273,7 @@ Terraform:
 kubeadm:
 
 - SSH can take several minutes after EC2 creation. The wait/retry loop is expected.
+- Worker public SSH can occasionally stay unreachable even after the node is manageable through AWS. Fixed by adding an SSM fallback for worker prerequisite installation and `kubeadm join`.
 - Direct `scp` of `/tmp/kubeadm-join.sh` can fail due permissions. Fixed with sudo `cat` fallback.
 
 Flux:

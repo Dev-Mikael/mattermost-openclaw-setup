@@ -3,6 +3,7 @@ kind: Kustomization
 resources:
   - cert-manager/
   - nginx-ingress/
+  - aws-ebs-csi/
   - external-secrets/
   - cnpg/
   - mattermost-operator/
