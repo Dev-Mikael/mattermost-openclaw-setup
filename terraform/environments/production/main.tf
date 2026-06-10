@@ -1,8 +1,8 @@
 terraform {
-  required_version = ">= 1.6.0"
+  required_version = ">= 1.10.0"
   required_providers {
-    aws   = { source = "hashicorp/aws",   version = "~> 5.0" }
-    tls   = { source = "hashicorp/tls",   version = "~> 4.0" }
+    aws   = { source = "hashicorp/aws", version = "~> 5.0" }
+    tls   = { source = "hashicorp/tls", version = "~> 4.0" }
     local = { source = "hashicorp/local", version = "~> 2.4" }
   }
 }
@@ -17,10 +17,10 @@ locals {
 }
 
 module "vpc" {
-  source       = "../../modules/vpc"
-  cluster_name = local.cluster_name
-  environment  = local.environment
-  vpc_cidr     = "10.0.0.0/16"
+  source              = "../../modules/vpc"
+  cluster_name        = local.cluster_name
+  environment         = local.environment
+  vpc_cidr            = "10.0.0.0/16"
   public_subnet_cidrs = ["10.0.1.0/24", "10.0.2.0/24"]
 }
 

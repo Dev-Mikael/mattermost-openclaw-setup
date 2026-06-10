@@ -7,7 +7,7 @@ help:
 	@echo "  Mattermost GitOps — Available targets:"
 	@echo ""
 	@echo "  First-time setup:"
-	@echo "    make state-backend     Create S3 + DynamoDB for Terraform state (run once)"
+	@echo "    make state-backend     Create S3 bucket for Terraform state (run once)"
 	@echo ""
 	@echo "  Main workflow:"
 	@echo "    make deploy            Run full bootstrap (Terraform + kubeadm + Flux)"
@@ -21,7 +21,7 @@ help:
 	@echo ""
 
 state-backend:
-	@echo "Creating Terraform state backend (S3 + DynamoDB)..."
+	@echo "Creating Terraform state backend (S3 bucket; environments use S3 lockfiles)..."
 	cd terraform/state-backend && terraform init && terraform apply
 	@echo ""
 	@echo "Copy the bucket name above into:"
@@ -41,6 +41,7 @@ plan:
 
 validate:
 	@echo "Validating Kubernetes manifests..."
+	kubectl kustomize clusters/staging >/dev/null
 	kubectl kustomize clusters/production >/dev/null
 	kubectl kustomize infrastructure >/dev/null
 	kubectl kustomize apps/database >/dev/null

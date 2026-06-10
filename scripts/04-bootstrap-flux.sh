@@ -10,11 +10,6 @@ ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 source "$SCRIPT_DIR/lib/common.sh"
 load_env "$ROOT_DIR/.env"
 
-if [[ "${MM_BOT_DM_POLICY:-pairing}" == "open" ]]; then
-  MM_BOT_ALLOW_FROM='["*"]'
-else
-  MM_BOT_ALLOW_FROM='[]'
-fi
 CLUSTER_PATH="clusters/${CLUSTER_NAME:-production}"
 
 log_section "04 — Bootstrap FluxCD"

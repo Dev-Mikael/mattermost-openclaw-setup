@@ -63,7 +63,7 @@ Create DNS records after Terraform prints the NLB DNS name:
 | `bootstrap.sh` | Full deploy: tools, Terraform, kubeadm, Flux, secrets, verify, OpenClaw |
 | `teardown.sh` | Destroys Terraform-managed cloud infrastructure |
 | `Makefile` | Convenience targets for deploy, validate, status, teardown |
-| `terraform/state-backend/` | S3 + DynamoDB backend for Terraform state |
+| `terraform/state-backend/` | S3 backend bucket for Terraform state; environment backends use S3 lockfiles |
 | `terraform/environments/` | Staging and production Terraform roots |
 | `terraform/modules/` | VPC, EC2, IAM, NLB, S3, Secrets Manager modules |
 | `clusters/production/` | Flux Kustomization dependency chain |

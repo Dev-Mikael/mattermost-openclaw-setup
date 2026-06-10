@@ -47,7 +47,7 @@ if grep -q "REPLACE-WITH-UNIQUE-SUFFIX" "$TF_DIR/terraform.tfvars"; then
 fi
 
 log_step "terraform init"
-terraform -chdir="$TF_DIR" init -upgrade 2>&1 | tail -5
+terraform -chdir="$TF_DIR" init -upgrade -reconfigure 2>&1 | tail -5
 
 log_step "terraform plan"
 terraform -chdir="$TF_DIR" plan -out=/tmp/tfplan 2>&1

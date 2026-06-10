@@ -4,9 +4,9 @@
 
 terraform {
   required_providers {
-    tls   = { source = "hashicorp/tls",   version = "~> 4.0" }
+    tls   = { source = "hashicorp/tls", version = "~> 4.0" }
     local = { source = "hashicorp/local", version = "~> 2.4" }
-    aws   = { source = "hashicorp/aws",   version = "~> 5.0" }
+    aws   = { source = "hashicorp/aws", version = "~> 5.0" }
   }
 }
 
@@ -216,8 +216,8 @@ resource "aws_instance" "control_plane" {
 resource "aws_instance" "workers" {
   count = var.worker_count
 
-  ami                         = data.aws_ami.ubuntu.id
-  instance_type               = var.worker_instance_type
+  ami           = data.aws_ami.ubuntu.id
+  instance_type = var.worker_instance_type
   # Distribute workers across subnets/AZs for resilience
   subnet_id                   = var.public_subnet_ids[count.index % length(var.public_subnet_ids)]
   vpc_security_group_ids      = [aws_security_group.workers.id]

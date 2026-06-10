@@ -9,9 +9,3 @@ variable "state_bucket_name" {
   type        = string
   # Example: "mattermost-tfstate-123456789012"
 }
-
-variable "lock_table_name" {
-  description = "DynamoDB table name for Terraform state locking"
-  type        = string
-  default     = "mattermost-terraform-locks"
-}

@@ -5,8 +5,8 @@
 
 resource "aws_vpc" "main" {
   cidr_block           = var.vpc_cidr
-  enable_dns_support   = true   # Required for Kubernetes DNS resolution
-  enable_dns_hostnames = true   # Required for AWS service endpoints
+  enable_dns_support   = true # Required for Kubernetes DNS resolution
+  enable_dns_hostnames = true # Required for AWS service endpoints
 
   tags = {
     Name        = "${var.cluster_name}-vpc"

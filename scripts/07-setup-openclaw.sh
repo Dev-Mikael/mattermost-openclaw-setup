@@ -243,7 +243,8 @@ fi
 
 log_section "OpenClaw Setup Complete"
 echo ""
-echo "  OpenClaw URL : https://openclaw.${DOMAIN}/#token=${OPENCLAW_GATEWAY_TOKEN}"
+echo "  OpenClaw URL : https://openclaw.${DOMAIN}"
+echo "  Token source : OPENCLAW_GATEWAY_TOKEN in your local .env"
 echo "  DM policy    : ${MM_BOT_DM_POLICY}"
 echo "  Channels     : ${MM_BOT_CHANNELS}"
 echo ""
