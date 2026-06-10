@@ -88,7 +88,7 @@ log_step "Ensuring Mattermost admin exists"
 LOGIN_RESP=$(curl -s -i -X POST "$MM_API/api/v4/users/login" \
   -H "Content-Type: application/json" \
   -d "{\"login_id\":\"${MM_ADMIN_USERNAME}\",\"password\":\"${MM_ADMIN_PASSWORD}\"}" 2>/dev/null || true)
-MM_TOKEN=$(echo "$LOGIN_RESP" | awk 'BEGIN{IGNORECASE=1} /^token:/ {print $2}' | tr -d '\r\n')
+MM_TOKEN=$(echo "$LOGIN_RESP" | grep -i '^token:' | awk '{print $2}' | tr -d '\r\n')
 
 if [[ -z "$MM_TOKEN" ]]; then
   log_info "Admin login failed; trying first-user creation"
@@ -102,7 +102,7 @@ if [[ -z "$MM_TOKEN" ]]; then
   LOGIN_RESP=$(curl -s -i -X POST "$MM_API/api/v4/users/login" \
     -H "Content-Type: application/json" \
     -d "{\"login_id\":\"${MM_ADMIN_USERNAME}\",\"password\":\"${MM_ADMIN_PASSWORD}\"}" 2>/dev/null || true)
-  MM_TOKEN=$(echo "$LOGIN_RESP" | awk 'BEGIN{IGNORECASE=1} /^token:/ {print $2}' | tr -d '\r\n')
+  MM_TOKEN=$(echo "$LOGIN_RESP" | grep -i '^token:' | awk '{print $2}' | tr -d '\r\n')
 fi
 
 [[ -z "$MM_TOKEN" ]] && {

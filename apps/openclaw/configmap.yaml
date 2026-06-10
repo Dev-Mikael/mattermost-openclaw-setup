@@ -17,7 +17,12 @@ data:
           "token": "$${OPENCLAW_GATEWAY_TOKEN}"
         },
         "controlUi": {
-          "enabled": true
+          "enabled": true,
+          "allowedOrigins": [
+            "https://openclaw.${DOMAIN}",
+            "http://localhost:18789",
+            "http://127.0.0.1:18789"
+          ]
         }
       },
       "session": {
@@ -64,14 +69,17 @@ data:
         "mattermost": {
           "enabled": true,
           "botToken": "$${MATTERMOST_BOT_TOKEN}",
-          "baseUrl": "http://mattermost.mattermost.svc.cluster.local:8065",
+          "baseUrl": "https://${DOMAIN}",
           "chatmode": "oncall",
           "dmPolicy": "${MM_BOT_DM_POLICY}",
           "groupPolicy": "open",
+          "interactions": {
+            "callbackBaseUrl": "https://openclaw.${DOMAIN}"
+          },
           "commands": {
             "native": true,
             "nativeSkills": true,
-            "callbackUrl": "http://openclaw.openclaw.svc.cluster.local:18789/api/channels/mattermost/command"
+            "callbackUrl": "https://openclaw.${DOMAIN}/api/channels/mattermost/command"
           }
         }
       },
