@@ -44,7 +44,7 @@ data:
             }
           },
           "sandbox": {
-            "mode": "non-main"
+            "mode": "off"
           }
         },
         "list": [
