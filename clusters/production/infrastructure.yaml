@@ -32,7 +32,7 @@ spec:
       namespace: external-secrets
     - apiVersion: apps/v1
       kind: Deployment
-      name: cnpg-controller-manager
+      name: cnpg-cloudnative-pg
       namespace: cnpg-system
     - apiVersion: apps/v1
       kind: Deployment
