@@ -42,12 +42,13 @@ spec:
   # Storage — one EBS-backed PVC per instance, sized for the deployment.
   # WaitForFirstConsumer on the ebs-gp3 StorageClass keeps volumes in the same
   # AZ as the scheduled database pod, while avoiding node-local disk lock-in.
-  # Keep this at 10Gi while upgrading live clusters from local-path; old
-  # local-path PVCs cannot be resized in place. Increase after all DB PVCs are
-  # EBS-backed.
+  # Existing live local-path PVCs cannot be resized in place. Keep
+  # resizeInUseVolumes disabled while transitioning live clusters so old PVCs
+  # stay untouched; fresh EBS PVCs still use the desired size below.
   storage:
-    size: 10Gi
+    size: 20Gi
     storageClass: ebs-gp3
+    resizeInUseVolumes: false
 
   # PostgreSQL configuration — tuned for t3.medium worker nodes
   # These parameters are PostgreSQL config values, not Kubernetes resource limits

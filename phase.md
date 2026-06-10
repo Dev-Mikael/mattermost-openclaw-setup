@@ -64,8 +64,9 @@ Current behavior:
 - Installs Flannel CNI.
 - Installs local-path-provisioner as fallback storage. CNPG is configured to use
   the EBS-backed `ebs-gp3` StorageClass installed by Flux.
-- Existing live local-path CNPG PVCs cannot be resized in place. Keep database
-  storage at 10Gi until all CNPG PVCs are EBS-backed, then increase size if needed.
+- Existing live local-path CNPG PVCs cannot be resized in place. Database storage
+  keeps `resizeInUseVolumes: false` during the transition so existing PVCs are
+  left alone while new EBS-backed PVCs use the desired size.
 - Fetches kubeconfig locally to `~/.kube/config`.
 - Fetches the worker join command using a sudo fallback when direct `scp` cannot read `/tmp/kubeadm-join.sh`.
 - Joins workers and waits for all nodes to become Ready.
