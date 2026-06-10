@@ -14,9 +14,12 @@ provider "aws" {
   region = var.aws_region
 }
 
+data "aws_caller_identity" "current" {}
+
 locals {
-  cluster_name = "${var.project_name}-staging"
-  environment  = "staging"
+  cluster_name  = "${var.project_name}-staging"
+  environment   = "staging"
+  bucket_suffix = var.bucket_suffix != "" ? var.bucket_suffix : data.aws_caller_identity.current.account_id
 }
 
 module "vpc" {
@@ -61,7 +64,7 @@ module "nlb" {
 
 module "s3" {
   source        = "../../modules/s3"
-  bucket_name   = "${var.project_name}-staging-files-${var.bucket_suffix}"
+  bucket_name   = "${var.project_name}-staging-files-${local.bucket_suffix}"
   environment   = local.environment
   domain        = var.domain
   force_destroy = true # Safe to delete in staging

@@ -1,9 +1,7 @@
+# Remote state backend for production.
+# Backend values are supplied by scripts/02-terraform-provision.sh so the
+# state bucket name never has to be copied into this file manually.
+
 terraform {
-  backend "s3" {
-    bucket       = "mattermostb"
-    key          = "production/terraform.tfstate"
-    region       = "us-east-1"
-    encrypt      = true
-    use_lockfile = true
-  }
+  backend "s3" {}
 }

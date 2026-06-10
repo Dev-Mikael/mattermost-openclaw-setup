@@ -42,7 +42,8 @@ Terraform state backend:
 - `terraform/state-backend/` creates the S3 state bucket.
 - Environment backends use S3 native lockfiles with `use_lockfile = true`.
 - The older `dynamodb_table` backend setting was removed because Terraform now warns that it is deprecated.
-- `scripts/02-terraform-provision.sh` runs `terraform init -reconfigure` so existing local backend metadata does not keep the old lock configuration.
+- `scripts/02-terraform-provision.sh` creates/ensures the state bucket automatically, then runs `terraform init -reconfigure` with `-backend-config` values.
+- Default state bucket name is `mattermost-openclaw-tfstate-<aws-account-id>`. Override with `TF_STATE_BUCKET_NAME` in `.env` only if needed.
 - Terraform version is now pinned at `>= 1.10.0` where lockfile support is expected.
 
 Important infrastructure fixes already applied:
@@ -238,15 +239,14 @@ After a teardown, the intended rebuild path is:
 
 1. Confirm `.env` has current non-secret settings and required secret values.
 2. Confirm AWS credentials with `aws sts get-caller-identity`.
-3. Confirm Terraform backend bucket exists from `terraform/state-backend/`.
-4. Run `bash bootstrap.sh`.
-5. After Terraform outputs the NLB DNS name, create/update Cloudflare CNAME records for `${DOMAIN}` and `openclaw.${DOMAIN}`.
-6. Watch Flux: `flux get kustomizations -A --watch`.
-7. Watch Mattermost: `kubectl get pods -n mattermost --watch`.
-8. Watch OpenClaw: `kubectl get pods -n openclaw --watch`.
-9. Confirm TLS: `kubectl get certificates -A`.
-10. Pair the Mattermost DM user if needed: `bash scripts/08-manage-bot.sh`.
-11. Test Mattermost DM and channel mention.
+3. Run `bash bootstrap.sh`; Terraform state backend creation is automatic.
+4. After Terraform outputs the NLB DNS name, create/update Cloudflare CNAME records for `${DOMAIN}` and `openclaw.${DOMAIN}`.
+5. Watch Flux: `flux get kustomizations -A --watch`.
+6. Watch Mattermost: `kubectl get pods -n mattermost --watch`.
+7. Watch OpenClaw: `kubectl get pods -n openclaw --watch`.
+8. Confirm TLS: `kubectl get certificates -A`.
+9. Pair the Mattermost DM user if needed: `bash scripts/08-manage-bot.sh`.
+10. Test Mattermost DM and channel mention.
 
 Validation commands:
 

@@ -13,10 +13,7 @@
 # Prerequisites:
 #   1. cp .env.example .env && nano .env   (fill in all values)
 #   2. Run: aws configure                  (set up AWS credentials once)
-#   3. Set up state backend (once per AWS account):
-#      cd terraform/state-backend && terraform init && terraform apply
-#      Then update terraform/environments/*/backend.tf with the bucket name.
-#   4. bash bootstrap.sh
+#   3. bash bootstrap.sh                   (state backend is created automatically)
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"

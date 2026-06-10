@@ -10,6 +10,8 @@ load_env "$ROOT_DIR/.env"
 
 ENVIRONMENT="${ENVIRONMENT:-production}"
 TF_DIR="$ROOT_DIR/terraform/environments/${ENVIRONMENT}"
+STATE_DIR="$ROOT_DIR/terraform/state-backend"
+AWS_REGION="${AWS_REGION:-us-east-1}"
 
 log_section "02 — Terraform: Provision Infrastructure (${ENVIRONMENT})"
 require_tool terraform
@@ -29,25 +31,24 @@ if [[ ! -d "$TF_DIR" ]]; then
   exit 1
 fi
 
-# ── Validate backend.tf has been configured ───────────────────────────────────
-if grep -q "REPLACE-WITH-YOUR-STATE-BUCKET-NAME" "$TF_DIR/backend.tf"; then
-  log_error "You must edit terraform/environments/${ENVIRONMENT}/backend.tf"
-  echo ""
-  echo "  1. First run the state backend setup (once per AWS account):"
-  echo "     cd terraform/state-backend && terraform init && terraform apply"
-  echo "  2. Copy the output bucket name into backend.tf"
-  echo "  3. Re-run bootstrap.sh"
-  exit 1
-fi
+STATE_BUCKET_NAME="${TF_STATE_BUCKET_NAME:-${STATE_BUCKET_NAME:-mattermost-openclaw-tfstate-${ACCOUNT_ID}}}"
 
-if grep -q "REPLACE-WITH-UNIQUE-SUFFIX" "$TF_DIR/terraform.tfvars"; then
-  log_error "Set bucket_suffix in terraform/environments/${ENVIRONMENT}/terraform.tfvars"
-  echo "  Use your AWS account ID: ${ACCOUNT_ID}"
-  exit 1
-fi
+log_step "Ensuring Terraform state backend (${STATE_BUCKET_NAME})"
+terraform -chdir="$STATE_DIR" init -upgrade 2>&1 | tail -5
+terraform -chdir="$STATE_DIR" apply -auto-approve \
+  -var="aws_region=${AWS_REGION}" \
+  -var="state_bucket_name=${STATE_BUCKET_NAME}"
+update_env "TF_STATE_BUCKET_NAME" "$STATE_BUCKET_NAME" "$ROOT_DIR/.env"
+log_ok "Terraform state backend ready"
 
 log_step "terraform init"
-terraform -chdir="$TF_DIR" init -upgrade -reconfigure 2>&1 | tail -5
+terraform -chdir="$TF_DIR" init -upgrade -reconfigure \
+  -backend-config="bucket=${STATE_BUCKET_NAME}" \
+  -backend-config="key=${ENVIRONMENT}/terraform.tfstate" \
+  -backend-config="region=${AWS_REGION}" \
+  -backend-config="encrypt=true" \
+  -backend-config="use_lockfile=true" \
+  2>&1 | tail -5
 
 log_step "terraform plan"
 terraform -chdir="$TF_DIR" plan -out=/tmp/tfplan 2>&1

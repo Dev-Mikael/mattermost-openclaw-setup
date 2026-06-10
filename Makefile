@@ -7,7 +7,7 @@ help:
 	@echo "  Mattermost GitOps — Available targets:"
 	@echo ""
 	@echo "  First-time setup:"
-	@echo "    make state-backend     Create S3 bucket for Terraform state (run once)"
+	@echo "    make state-backend     Optional: pre-create S3 bucket for Terraform state"
 	@echo ""
 	@echo "  Main workflow:"
 	@echo "    make deploy            Run full bootstrap (Terraform + kubeadm + Flux)"
@@ -21,12 +21,17 @@ help:
 	@echo ""
 
 state-backend:
-	@echo "Creating Terraform state backend (S3 bucket; environments use S3 lockfiles)..."
-	cd terraform/state-backend && terraform init && terraform apply
-	@echo ""
-	@echo "Copy the bucket name above into:"
-	@echo "  terraform/environments/staging/backend.tf"
-	@echo "  terraform/environments/production/backend.tf"
+	@set -a; [ -f .env ] && . ./.env; set +a; \
+	AWS_REGION=$${AWS_REGION:-us-east-1}; \
+	ACCOUNT_ID=$$(aws sts get-caller-identity --query Account --output text); \
+	BUCKET=$${TF_STATE_BUCKET_NAME:-mattermost-openclaw-tfstate-$$ACCOUNT_ID}; \
+	echo "Creating Terraform state backend: $$BUCKET"; \
+	terraform -chdir=terraform/state-backend init -upgrade; \
+	terraform -chdir=terraform/state-backend apply -auto-approve \
+	  -var="aws_region=$$AWS_REGION" \
+	  -var="state_bucket_name=$$BUCKET"; \
+	echo ""; \
+	echo "scripts/02-terraform-provision.sh will use this bucket automatically."
 
 deploy:
 	bash bootstrap.sh

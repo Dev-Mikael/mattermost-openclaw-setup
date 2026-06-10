@@ -32,22 +32,17 @@ infrastructure
 ## Quick Start
 
 ```bash
-# First time only: create remote Terraform state
-cd terraform/state-backend
-terraform init
-terraform apply
-
-# Copy the state bucket name into:
-# terraform/environments/staging/backend.tf
-# terraform/environments/production/backend.tf
-
-cd ../..
 cp .env.example .env
 nano .env
 aws configure
 
 bash bootstrap.sh
 ```
+
+`bootstrap.sh` automatically creates/uses the Terraform state bucket through
+`scripts/02-terraform-provision.sh`. By default the bucket is named
+`mattermost-openclaw-tfstate-<aws-account-id>`. Override with
+`TF_STATE_BUCKET_NAME` in `.env` only if you want a custom state bucket name.
 
 Create DNS records after Terraform prints the NLB DNS name:
 
@@ -63,7 +58,7 @@ Create DNS records after Terraform prints the NLB DNS name:
 | `bootstrap.sh` | Full deploy: tools, Terraform, kubeadm, Flux, secrets, verify, OpenClaw |
 | `teardown.sh` | Destroys Terraform-managed cloud infrastructure |
 | `Makefile` | Convenience targets for deploy, validate, status, teardown |
-| `terraform/state-backend/` | S3 backend bucket for Terraform state; environment backends use S3 lockfiles |
+| `terraform/state-backend/` | S3 backend bucket for Terraform state; created automatically by `scripts/02-terraform-provision.sh` |
 | `terraform/environments/` | Staging and production Terraform roots |
 | `terraform/modules/` | VPC, EC2, IAM, NLB, S3, Secrets Manager modules |
 | `clusters/production/` | Flux Kustomization dependency chain |
