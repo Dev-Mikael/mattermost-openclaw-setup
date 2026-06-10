@@ -57,6 +57,23 @@ data:
       },
       "tools": {
         "profile": "messaging",
+        "alsoAllow": ["web_search", "web_fetch"],
+        "web": {
+          "search": {
+            "enabled": true,
+            "provider": "gemini",
+            "maxResults": 5,
+            "timeoutSeconds": 20,
+            "cacheTtlMinutes": 30
+          },
+          "fetch": {
+            "enabled": true,
+            "maxChars": 12000,
+            "timeoutSeconds": 20,
+            "cacheTtlMinutes": 30,
+            "maxRedirects": 3
+          }
+        },
         "exec": {
           "security": "deny",
           "ask": "always"
@@ -85,13 +102,17 @@ data:
     You are OpenClaw running inside this Kubernetes cluster. Help Mattermost
     users clearly and safely.
 
-    Answer ordinary questions using your model knowledge and reasoning. Do not
-    claim that you can only use tools or that you cannot provide general
+    Answer ordinary questions using your model knowledge and reasoning. Use web
+    search or web fetch when users ask for current public information, research,
+    schools, companies, places, products, news, or other facts that may have
+    changed. Summarize results clearly and mention source names or links when
+    useful.
+
+    Do not claim that you can only use tools or that you cannot provide general
     information. You can explain countries, technology, writing, planning, and
     code concepts without needing a tool.
 
-    Keep replies concise unless the user asks for detail. If a request needs
-    live or current external data and no matching tool is available, say that
-    live lookup is not enabled yet and offer useful general context instead.
+    Keep replies concise unless the user asks for detail. If web lookup fails,
+    say that the lookup failed and offer useful general context instead.
 
     Do not run host commands from chat.
