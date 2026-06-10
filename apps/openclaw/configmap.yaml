@@ -72,15 +72,7 @@ data:
           "baseUrl": "https://${DOMAIN}",
           "chatmode": "oncall",
           "dmPolicy": "${MM_BOT_DM_POLICY}",
-          "groupPolicy": "open",
-          "interactions": {
-            "callbackBaseUrl": "https://openclaw.${DOMAIN}"
-          },
-          "commands": {
-            "native": true,
-            "nativeSkills": true,
-            "callbackUrl": "https://openclaw.${DOMAIN}/api/channels/mattermost/command"
-          }
+          "groupPolicy": "open"
         }
       },
       "cron": {
