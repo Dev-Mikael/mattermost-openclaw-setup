@@ -1,0 +1,120 @@
+# Mattermost Custom Resource — managed by the Mattermost Operator
+#
+# Image pinning: always pin to a specific version for GitOps reproducibility.
+# Check releases at: https://github.com/mattermost/mattermost/releases
+# Team Edition version carried forward from the newer reference deployment.
+#
+# Notification architecture (important for understanding why things work):
+#   Desktop/browser: Web Push API — requires HTTPS + user grants permission
+#   Mobile (iOS/Android): Mattermost pushes to TPNS/HPNS push proxy, which
+#     forwards to Apple APNS and Google FCM respectively.
+#   WebSocket: real-time updates — nginx must pass HTTP/1.1 Upgrade headers.
+apiVersion: installation.mattermost.com/v1beta1
+kind: Mattermost
+metadata:
+  name: mattermost
+  namespace: mattermost
+spec:
+  # 100users = 1 replica, appropriate resource requests for the operator to use
+  size: 100users
+
+  image: mattermost/mattermost-team-edition
+  version: "10.11.14"  # pinned — update this to upgrade Mattermost
+
+  # Ingress — nginx handles TLS termination, cert-manager issues the certificate
+  ingress:
+    enabled: true
+    host: ${DOMAIN}
+    annotations:
+      kubernetes.io/ingress.class: nginx
+      cert-manager.io/cluster-issuer: letsencrypt-prod
+      nginx.ingress.kubernetes.io/proxy-body-size: "100m"
+      nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+      nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
+      # proxy-http-version 1.1 is required for WebSocket upgrade.
+      # Without this, Mattermost WebSocket connections fail silently and
+      # desktop notifications, typing indicators, and real-time updates break.
+      nginx.ingress.kubernetes.io/proxy-http-version: "1.1"
+    tlsSecret: mattermost-tls
+
+  # Database — points to the Secret created by ESO from Secrets Manager.
+  # mattermost-db-rw service (CNPG) always follows the primary after failover.
+  database:
+    external:
+      secret: mattermost-db-credentials
+
+  # File storage — S3 bucket provisioned by Terraform
+  # No MinIO, no in-cluster object storage pod, no memory pressure.
+  fileStore:
+    external:
+      url: s3.amazonaws.com
+      bucket: ${S3_BUCKET_NAME}
+      secret: mattermost-s3-credentials
+
+  mattermostEnv:
+    # ── Core settings ──────────────────────────────────────────────────────
+    # SITEURL must match exactly what users type in the browser.
+    # Wrong SITEURL = push proxy registration fails, OAuth breaks, file URLs wrong.
+    - name: MM_SERVICESETTINGS_SITEURL
+      value: "https://${DOMAIN}"
+
+    # S3 region — must match the Terraform AWS region
+    - name: MM_FILESETTINGS_AMAZONS3REGION
+      value: "${AWS_REGION}"
+
+    # S3 uses IAM instance profile (no static keys) — SSE for encryption at rest
+    - name: MM_FILESETTINGS_AMAZONS3SSE
+      value: "true"
+
+    # ── Push notifications ─────────────────────────────────────────────────
+    # TPNS = free test service for Team Edition.
+    # push.mattermost.com (HPNS) requires a paid Professional licence.
+    # The mobile app will show "cannot receive notifications" if you use HPNS
+    # with Team Edition — this is the most common notification issue reported.
+    - name: MM_EMAILSETTINGS_SENDPUSHNOTIFICATIONS
+      value: "true"
+    - name: MM_EMAILSETTINGS_PUSHNOTIFICATIONSERVER
+      value: "https://push-test.mattermost.com"
+    - name: MM_EMAILSETTINGS_PUSHNOTIFICATIONCONTENTS
+      value: "full"
+    - name: MM_EMAILSETTINGS_PUSHNOTIFICATIONBUFFER
+      value: "1000"
+    # "always" = send push even when the user is online/active.
+    # Default "ooo" (out-of-office) only sends when offline — misses users who
+    # have the app open but aren't looking at the channel.
+    - name: MM_EMAILSETTINGS_PUSHNOTIFICATIONTRIGGERCONDITION
+      value: "always"
+
+    # ── WebSocket / real-time ──────────────────────────────────────────────
+    - name: MM_SERVICESETTINGS_ENABLEUSERTYPINGMESSAGES
+      value: "true"
+    - name: MM_SERVICESETTINGS_ENABLECHANNELVIEWEDMESSAGES
+      value: "true"
+    - name: MM_EMAILSETTINGS_ENABLEEMAILBATCHING
+      value: "false"
+    - name: MM_SERVICESETTINGS_ALLOWCORSFROM
+      value: ""
+    - name: MM_SERVICESETTINGS_WEBSOCKETURL
+      value: ""
+
+    # ── Logging ────────────────────────────────────────────────────────────
+    - name: MM_LOGSETTINGS_CONSOLELEVEL
+      value: "INFO"
+
+    # ── Auth ───────────────────────────────────────────────────────────────
+    - name: MM_EMAILSETTINGS_ENABLESIGNINWITHEMAIL
+      value: "true"
+    - name: MM_EMAILSETTINGS_ENABLESIGNINWITHUSERNAME
+      value: "true"
+
+    # Allow internal CNPG and OpenClaw callback connections without TLS validation issues
+    - name: MM_SERVICESETTINGS_ALLOWEDUNTRUSTEDINTERNALCONNECTIONS
+      value: "mattermost-db-rw.mattermost.svc.cluster.local kubeclaw.kubeclaw.svc.cluster.local"
+    - name: MM_FILESETTINGS_AMAZONS3SSL
+      value: "true"   # S3 always uses HTTPS
+
+    # Required by scripts/07-setup-openclaw.sh to create openclaw-bot and token
+    - name: MM_SERVICESETTINGS_ENABLEBOTACCOUNTCREATION
+      value: "true"
+    - name: MM_SERVICESETTINGS_ENABLEUSERACCESSTOKENS
+      value: "true"

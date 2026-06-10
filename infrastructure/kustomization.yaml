@@ -1,0 +1,11 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - cert-manager/
+  - nginx-ingress/
+  - external-secrets/
+  - cnpg/
+  - mattermost-operator/
+# NOTE: cert-manager-config/ and external-secrets-config/ are NOT listed here.
+# They are separate Flux Kustomizations that dependsOn this one, ensuring
+# CRDs exist before ClusterIssuer and ClusterSecretStore are applied.

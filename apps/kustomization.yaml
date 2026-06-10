@@ -1,0 +1,6 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - mattermost/
+# database/ is applied by its own Flux Kustomization (clusters/production/database.yaml)
+# with a dependsOn chain. It is NOT listed here to avoid CRD timing issues.

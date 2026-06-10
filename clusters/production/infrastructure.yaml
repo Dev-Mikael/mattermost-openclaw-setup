@@ -1,0 +1,40 @@
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: infrastructure
+  namespace: flux-system
+spec:
+  interval: 10m0s
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  path: ./infrastructure
+  prune: true
+  wait: true       # Wait for ALL HelmReleases to be Ready before marking Done
+  timeout: 20m0s   # Helm chart downloads can be slow on fresh nodes
+  postBuild:
+    substituteFrom:
+      - kind: ConfigMap
+        name: cluster-values
+  # Health checks ensure operators are fully running before dependents apply
+  healthChecks:
+    - apiVersion: apps/v1
+      kind: Deployment
+      name: cert-manager
+      namespace: cert-manager
+    - apiVersion: apps/v1
+      kind: Deployment
+      name: ingress-nginx-controller
+      namespace: ingress-nginx
+    - apiVersion: apps/v1
+      kind: Deployment
+      name: external-secrets
+      namespace: external-secrets
+    - apiVersion: apps/v1
+      kind: Deployment
+      name: cnpg-controller-manager
+      namespace: cnpg-system
+    - apiVersion: apps/v1
+      kind: Deployment
+      name: mattermost-operator
+      namespace: mattermost-operator

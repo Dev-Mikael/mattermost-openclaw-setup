@@ -1,0 +1,79 @@
+# CloudNativePG Cluster — HA PostgreSQL with primary + replica
+#
+# Key concepts demonstrated here (relevant to KCNA):
+#   - Custom Resource: Cluster is a CRD installed by the CNPG operator
+#   - Operator pattern: CNPG watches this CR and reconciles the desired state
+#   - StatefulSet under the hood: CNPG creates a StatefulSet for the pods
+#   - PVC lifecycle: each instance gets its own PVC (volumeClaimTemplates)
+#   - Service abstraction: CNPG creates three services automatically:
+#       mattermost-db-rw  → always routes to primary (read-write)
+#       mattermost-db-ro  → always routes to replicas (read-only)
+#       mattermost-db-r   → routes to any instance
+#
+# HA behaviour:
+#   If the primary pod is deleted or the node it runs on goes down:
+#   1. CNPG detects the primary is gone (via failover timeout)
+#   2. CNPG elects a replica as the new primary
+#   3. The mattermost-db-rw Service selector is updated to the new primary
+#   4. Mattermost reconnects on the next query retry
+#   5. The old primary pod is restarted as a replica when its node recovers
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: mattermost-db
+  namespace: mattermost
+spec:
+  # 2 instances = 1 primary + 1 replica. Enough for HA with low resource usage.
+  # Increase to 3 for quorum-based leader election in production.
+  instances: 2
+
+  # PostgreSQL version — pin to major.minor for reproducibility
+  imageName: ghcr.io/cloudnative-pg/postgresql:16.4
+
+  # Bootstrap: create the mattermost database and mmuser role
+  bootstrap:
+    initdb:
+      database: mattermost
+      owner: mmuser
+      # Secret created by ESO from AWS Secrets Manager
+      secret:
+        name: cnpg-app-user-secret
+
+  # Storage — one PVC per instance, sized for the deployment
+  storage:
+    size: 10Gi
+    storageClass: local-path   # local-path-provisioner installed by kubeadm script
+
+  # PostgreSQL configuration — tuned for a t3.medium worker node
+  # These parameters are PostgreSQL config values, not Kubernetes resource limits
+  postgresql:
+    parameters:
+      max_connections: "100"
+      shared_buffers: "128MB"        # ~25% of the 512Mi memory limit below
+      effective_cache_size: "256MB"
+      work_mem: "4MB"
+      maintenance_work_mem: "32MB"
+      checkpoint_completion_target: "0.9"
+      wal_buffers: "16MB"
+      default_statistics_target: "100"
+      log_min_duration_statement: "1000"  # Log slow queries > 1s
+
+  # Resource limits — scoped to fit on a t3.medium worker
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      cpu: 1000m
+      memory: 512Mi
+
+  # Anti-affinity: ensure primary and replica land on different worker nodes
+  # If both were on the same node, a node failure would take out the whole cluster
+  affinity:
+    podAntiAffinityType: preferred   # preferred = try but don't block scheduling
+    topologyKey: kubernetes.io/hostname
+
+  # Monitoring — exposes PostgreSQL metrics for Prometheus scraping
+  # (used when you add the kube-prometheus-stack later)
+  monitoring:
+    enablePodMonitor: false   # set to true after adding Prometheus

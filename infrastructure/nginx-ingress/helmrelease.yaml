@@ -1,0 +1,70 @@
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: ingress-nginx
+  namespace: flux-system
+spec:
+  interval: 1h
+  url: https://kubernetes.github.io/ingress-nginx
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: ingress-nginx
+  namespace: ingress-nginx
+spec:
+  interval: 10m
+  chart:
+    spec:
+      chart: ingress-nginx
+      version: "4.11.3"  # pinned — check https://github.com/kubernetes/ingress-nginx/releases
+      sourceRef:
+        kind: HelmRepository
+        name: ingress-nginx
+        namespace: flux-system
+      interval: 1h
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    remediation:
+      retries: 3
+      remediateLastFailure: true
+      strategy: rollback
+  values:
+    controller:
+      # NodePort: NLB forwards 80→30080 and 443→30443 to all worker nodes.
+      # This replaces MetalLB entirely — the NLB is the external-facing load balancer.
+      service:
+        type: NodePort
+        nodePorts:
+          http: "30080"
+          https: "30443"
+
+      config:
+        proxy-body-size: "100m"
+        proxy-read-timeout: "600"
+        proxy-send-timeout: "600"
+        # Required for Mattermost WebSocket (real-time messaging + notifications)
+        proxy-http-version: "1.1"
+        use-forwarded-headers: "true"
+        compute-full-forwarded-for: "true"
+
+      resources:
+        requests:
+          cpu: 100m
+          memory: 128Mi
+        limits:
+          cpu: 500m
+          memory: 512Mi
+
+      # Enable pod disruption budget for rolling updates
+      podDisruptionBudget:
+        enabled: true
+        minAvailable: 1
+
+    defaultBackend:
+      enabled: true
+      resources:
+        requests: { cpu: 10m, memory: 16Mi }
+        limits:   { cpu: 20m, memory: 32Mi }

@@ -1,0 +1,20 @@
+# Secrets — never commit these
+.env
+*.pem
+*.key
+
+# Terraform
+**/.terraform/
+*.tfstate
+*.tfstate.backup
+*.tfplan
+.terraform.lock.hcl
+terraform/environments/*/mattermost-setup-key.pem
+
+# Local tools
+*.bak
+/tmp/
+
+# OS
+.DS_Store
+Thumbs.db
